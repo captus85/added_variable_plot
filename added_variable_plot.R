@@ -1,23 +1,32 @@
-# library(tidyverse)
-# library(readxl)
-# library(reshape2)
-# library(ggplot2)
-# library(lm.beta)
-# library(devtools)
-# library(plyr)
-# library(GGally)
-# library(car)
+library(tidyverse)
+library(readxl)
+library(reshape2)
+library(ggplot2)
+library(lm.beta)
+library(devtools)
+library(plyr)
+library(GGally)
+library(car)
+library(broom)
 
 rm(list=ls())
-ad.df <- read_xlsx("ad.xlsx")
+ad.df <- read_xlsx("SPARE_AD_SPARE_BA_HVA_202000417.xlsx")
+table(ad.df$homocysteine_2_outlier제거, useNA = "always")
 
 ad.lm <- ad.df %>%
   select(id=Ref_id, dia = 최종임상진단, sex=성별, edu=교육연수, age=연령,
-         VRSnonDM=VRS_DM제외, VitB12, Folate, Creatinine, Homocysteine,
-         DM, HbA1c, HBA1c.f = HbA1c_사분위수, SPARE_AD_index, SPARE_BA_index)
+         VRSnonDM=VRS_DM제외, VitB12 = VitB12RIA, Folate = FolateRIA, 
+         Creatinine = CreatinineS, 
+         Homocysteine = homocysteine_2_outlier제거,
+         DM = b03_diabetes, HbA1c, HBA1c.f = HbA1c_사분위수, 
+         SPARE_AD_index = SPARE_AD_Volume_ICVadjusted, 
+         SPARE_BA_index = SPARE_BA_Volume_ICVadjusted)
 
 ad.lm <- ad.lm %>%
   filter(complete.cases(.))
+
+table(ad.lm$Homocysteine, useNA = "always")
+
 
 ad.lm$DM[ad.lm$DM == 0] <- 2 
 ad.lm$DM <- factor(ad.lm$DM)
@@ -60,13 +69,13 @@ ggplot(ad.nondm, aes(x = Homocysteine, y = SPARE_AD_index)) +
 
 
 
-fit1 <- lm(SPARE_AD_index ~ dia + sex + age + edu + VRSnonDM + VitB12 + 
+fit1 <- lm(SPARE_BA_index ~ dia + sex + age + edu + VRSnonDM + VitB12 + 
              Folate + Creatinine + Homocysteine, data = ad.nondm)
 
-fit2 <- lm(SPARE_AD_index ~ dia + sex + age + edu + VRSnonDM + VitB12 + 
+fit2 <- lm(SPARE_BA_index ~ dia + sex + age + edu + VRSnonDM + VitB12 + 
              Folate + Creatinine + Homocysteine, data = ad.dm)
 
-(mod_vars = all.vars( formula(fit1) )[-1])
+(mod_vars = all.vars(formula(fit1))[-1])
 
 preddat_fun = function(data, allvars, var) {
   sums = summarise_at(data, 
@@ -94,10 +103,7 @@ pred_dats2 = mod_vars %>%
   set_names() %>%
   map(~preddat_fun(ad.dm, mod_vars, .x) )
 
-pred_dats2$Homocysteine[68,]
-range(pred_dats$Homocysteine[,1])
-pred_dats2$Homocysteine[69,] <- c(64.09, 2, 0.5, 74, 12, 1, 477.5, 8.6, 1.05)
-pred_dats2$Homocysteine[70,] <- c(7.29, 2, 0.5, 74, 12, 1, 477.5, 8.6, 1.05)
+
 
 preds_dm = pred_dats2 %>%
   map(~augment(fit2, newdata = .x) ) %>%
